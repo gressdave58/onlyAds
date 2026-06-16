@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="AdLoader" extends="Task">
+  <interface>
+    <field id="vastTags" type="array" />
+    <field id="requestTimeoutSeconds" type="integer" value="15" />
+    <field id="maxAdsPerRefresh" type="integer" value="10" />
+    <field id="debugEnabled" type="boolean" value="false" />
+    <field id="adUrls" type="array" alwaysNotify="true" />
+    <field id="adDetails" type="array" alwaysNotify="true" />
+    <field id="status" type="string" alwaysNotify="true" />
+    <field id="error" type="string" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/AdLoader.brs" />
+</component>
