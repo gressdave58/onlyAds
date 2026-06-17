@@ -1,12 +1,18 @@
 sub init()
+    print "[OnlyAds] MainScene init"
+
     m.video = m.top.FindNode("adVideo")
     m.status = m.top.FindNode("statusLabel")
+    m.aboutHint = m.top.FindNode("aboutHintLabel")
     m.loader = CreateObject("roSGNode", "AdLoader")
 
     m.adUrls = []
     m.adDetails = []
     m.adIndex = -1
     m.pausedByUser = false
+    m.resumeAfterDialog = false
+    m.currentAdTimer = invalid
+    m.dialogMode = ""
 
     m.video.ObserveField("state", "onVideoStateChanged")
     m.loader.ObserveField("adDetails", "onAdDetailsLoaded")
@@ -14,13 +20,14 @@ sub init()
     m.loader.ObserveField("status", "onAdLoadStatus")
     m.loader.ObserveField("error", "onAdLoadError")
 
+    keepSceneFocus()
     m.top.SetFocus(true)
     loadAds()
 end sub
 
 sub loadAds()
     config = GetAdConfig()
-    m.status.text = "Loading ads"
+    m.status.text = "Loading ads - press Up for About"
     m.loader.vastTags = config.vastTags
     m.loader.requestTimeoutSeconds = config.requestTimeoutSeconds
     m.loader.maxAdsPerRefresh = config.maxAdsPerRefresh
@@ -96,26 +103,62 @@ sub playNextAd()
     printAdBeforePlay(ad, m.adIndex, m.adUrls.Count())
     debugLog("Playing ad " + (m.adIndex + 1).ToStr() + "/" + m.adUrls.Count().ToStr() + " format=" + content.streamformat + " url=" + content.url)
     m.video.content = content
+    m.currentAdTimer = CreateObject("roTimespan")
+    m.currentAdTimer.Mark()
     m.video.control = "play"
+    keepSceneFocus()
 end sub
 
 sub onVideoStateChanged()
     state = m.video.state
     debugLog("Video state: " + state)
     if state = "finished" then
+        logCurrentAdElapsed("finished")
         playNextAd()
     else if state = "error" then
+        logCurrentAdElapsed("error")
         m.status.text = "Skipping ad that failed to play"
         playNextAd()
     else if state = "playing" then
         m.status.text = ""
+        keepSceneFocus()
     end if
+end sub
+
+sub keepSceneFocus()
+    if m.video <> invalid then
+        if m.video.HasField("enableUI") then m.video.enableUI = false
+        m.video.SetFocus(false)
+    end if
+    m.top.SetFocus(true)
+end sub
+
+sub logCurrentAdElapsed(reason as string)
+    if m.currentAdTimer = invalid then
+        debugLog("Ad " + reason + " before timer started")
+        return
+    end if
+
+    elapsedMs = m.currentAdTimer.TotalMilliseconds()
+    elapsedSeconds = elapsedMs / 1000.0
+    debugLog("Ad " + reason + " after " + elapsedSeconds.ToStr() + " seconds")
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    debugLog("Key pressed: " + key)
 
-    if key = "OK" or key = "play" then
+    if key = "options" or key = "option" or key = "*" then
+        showAboutDialog()
+        return true
+    end if
+
+    if key = "OK" or key = "up" then
+        showAboutDialog()
+        return true
+    end if
+
+    if key = "play" then
         if m.video.state = "playing" then
             m.pausedByUser = true
             m.video.control = "pause"
@@ -125,6 +168,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     else if key = "right" then
+        logCurrentAdElapsed("skipped")
         playNextAd()
         return true
     else if key = "back" then
@@ -134,6 +178,50 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     return false
 end function
+
+sub showAboutDialog()
+    closeDialog()
+
+    if m.video <> invalid and m.video.state = "playing" then
+        m.resumeAfterDialog = true
+        m.video.control = "pause"
+    else
+        m.resumeAfterDialog = false
+    end if
+
+    dialog = CreateObject("roSGNode", "Dialog")
+    dialog.title = "Only Ads"
+    dialog.message = "Status: Paused" + Chr(10) + "Developed by: gressware.ai" + Chr(10) + "Version 1.1"
+    dialog.buttons = ["OK"]
+    dialog.ObserveField("buttonSelected", "onDialogButtonSelected")
+
+    m.dialogMode = "about"
+    m.top.dialog = dialog
+    debugLog("Showing about dialog")
+end sub
+
+sub onDialogButtonSelected()
+    dialog = m.top.dialog
+    if dialog = invalid then return
+
+    selected = dialog.buttonSelected
+    debugLog("Dialog selected mode=" + m.dialogMode + " button=" + selected.ToStr())
+
+    closeDialog()
+end sub
+
+sub closeDialog()
+    if m.top.dialog <> invalid then
+        m.top.dialog.close = true
+    end if
+    m.dialogMode = ""
+
+    if m.resumeAfterDialog then
+        m.resumeAfterDialog = false
+        m.video.control = "resume"
+        keepSceneFocus()
+    end if
+end sub
 
 function inferStreamFormat(url as string) as string
     lowerUrl = LCase(url)

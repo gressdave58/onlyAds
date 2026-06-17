@@ -15,6 +15,16 @@
       horizAlign="left"
       vertAlign="center"
       font="font:MediumSystemFont" />
+    <Label
+      id="aboutHintLabel"
+      width="360"
+      height="44"
+      translation="[1480,40]"
+      color="0xFFFFFFFF"
+      text="OK: About"
+      horizAlign="right"
+      vertAlign="center"
+      font="font:MediumSystemFont" />
   </children>
   <script type="text/brightscript" uri="pkg:/source/config.brs" />
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
